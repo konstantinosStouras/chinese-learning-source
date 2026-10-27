@@ -9,7 +9,7 @@ const db=getFirestore(),secrets=new SecretManagerServiceClient();
 const project='stouras-chinese';
 const stamp=()=>FieldValue.serverTimestamp();
 const fail=(code,message)=>{throw new HttpsError(code,message);};
-async function isAdmin(auth){return !!auth&&(owner(auth.token)||(await db.doc(`admins/${auth.uid}`).get()).exists);}
+async function isAdmin(auth){return !!auth&&(owner(auth.token)||((auth.token.email_verified===true||auth.uid==='shared-teacher')&&(await db.doc(`admins/${auth.uid}`).get()).exists));}
 async function secret(provider){try{const [v]=await secrets.accessSecretVersion({name:`projects/${project}/secrets/chinese-${provider}/versions/latest`});return JSON.parse(v.payload.data.toString());}catch{fail('failed-precondition','Your lecturer has not connected this speech service yet.');}}
 async function limits(uid){
  const day=new Date().toISOString().slice(0,10),refs=[db.doc(`usage/${day}-${uid}`),db.doc(`usage/${day}-total`)];

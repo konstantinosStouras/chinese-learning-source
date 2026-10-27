@@ -3,7 +3,8 @@ service cloud.firestore {
  match /databases/{database}/documents {
   function signed(){return request.auth != null;}
   function owner(){return signed() && request.auth.token.email == 'kstouras@gmail.com' && request.auth.token.email_verified == true && request.auth.token.firebase.sign_in_provider == 'google.com';}
-  function admin(){return owner() || (signed() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));}
+  function verified(){return signed() && (request.auth.token.email_verified == true || request.auth.uid == 'shared-teacher');}
+  function admin(){return owner() || (verified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));}
   function lessonValid(){let d=request.resource.data;return d.keys().hasOnly(['moduleId','week','title','intro','repetitions','vocabulary','showPinyin','showMeaning','writing','speaking','pinyin','randomize','sample','published','updatedAt','updatedBy'])
    && d.moduleId in ['beginner','business','hsk5'] && d.week is int && d.week >= 1 && d.week <= 12
    && d.title is string && d.title.size() > 0 && d.title.size() <= 100
@@ -34,16 +35,19 @@ service cloud.firestore {
   match /users/{uid} {
    allow read: if admin() || (signed() && request.auth.uid == uid);
    allow create, update: if signed() && request.auth.uid == uid
-    && request.resource.data.keys().hasOnly(['name','email','moduleId','updatedAt'])
+    && request.resource.data.keys().hasOnly(['name','firstName','lastName','email','moduleId','updatedAt'])
     && request.resource.data.email == request.auth.token.email
     && request.resource.data.name is string && request.resource.data.name.size() <= 120
+    && (!request.resource.data.keys().hasAny(['firstName','lastName']) || (request.resource.data.keys().hasAll(['firstName','lastName'])
+      && request.resource.data.firstName is string && request.resource.data.firstName.size() > 0 && request.resource.data.firstName.size() <= 60
+      && request.resource.data.lastName is string && request.resource.data.lastName.size() > 0 && request.resource.data.lastName.size() <= 60))
     && request.resource.data.moduleId in ['beginner','business','hsk5']
     && request.resource.data.updatedAt == request.time;
    allow delete: if false;
   }
   match /attempts/{id} {
    allow read: if admin() || (signed() && resource.data.uid == request.auth.uid);
-   allow create: if signed() && request.resource.data.keys().hasOnly(['uid','moduleId','lessonId','hanzi','kind','correct','mistakes','createdAt'])
+   allow create: if verified() && request.resource.data.keys().hasOnly(['uid','moduleId','lessonId','hanzi','kind','correct','mistakes','createdAt'])
     && request.resource.data.uid == request.auth.uid
     && request.resource.data.moduleId in ['beginner','business','hsk5']
     && request.resource.data.lessonId is string && request.resource.data.lessonId.size() < 60
