@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
  match /databases/{database}/documents {
-  function signed(){return request.auth != null;}
+  function signed(){return request.auth != null && !exists(/databases/$(database)/documents/accountDeletions/$(request.auth.uid));}
   function owner(){return signed() && request.auth.token.email == 'kstouras@gmail.com' && request.auth.token.email_verified == true && request.auth.token.firebase.sign_in_provider == 'google.com';}
   function verified(){return signed() && (request.auth.token.email_verified == true || request.auth.uid == 'shared-teacher');}
   function admin(){return owner() || (verified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));}
@@ -53,6 +53,7 @@ service cloud.firestore {
    allow update, delete: if false;
   }
   match /speechFeedback/{id} {allow read: if admin() || (signed() && resource.data.uid == request.auth.uid); allow write: if false;}
+  match /threads/{uid} {allow read: if admin() || (verified() && request.auth.uid == uid); allow write: if false;}
   match /{document=**} {allow read,write: if false;}
  }
 }

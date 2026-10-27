@@ -1,6 +1,6 @@
 import {initializeApp} from 'firebase/app';
-import {getAuth,GoogleAuthProvider,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,updateProfile,sendEmailVerification,sendPasswordResetEmail,reload,onAuthStateChanged,signOut} from 'firebase/auth';
-import {getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,deleteDoc,writeBatch,query,where,orderBy,limit,serverTimestamp} from 'firebase/firestore';
+import {getAuth,GoogleAuthProvider,EmailAuthProvider,reauthenticateWithCredential,reauthenticateWithPopup,signInWithPopup,signInWithEmailAndPassword,createUserWithEmailAndPassword,updateProfile,sendEmailVerification,sendPasswordResetEmail,reload,onAuthStateChanged,signOut} from 'firebase/auth';
+import {getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,deleteDoc,writeBatch,query,where,orderBy,limit,serverTimestamp,onSnapshot} from 'firebase/firestore';
 import {getFunctions,httpsCallable} from 'firebase/functions';
 import config from './firebase-config.json';
 import validation from '../_chinese-firebase/functions/validation.js';
@@ -24,6 +24,13 @@ export const api=async data=>{
  return (await call(data)).data;
 };
 export const googleLogin=()=>signInWithPopup(auth,new GoogleAuthProvider());
+export async function confirmIdentity(password){
+ const user=auth.currentUser;if(!user)throw Error('Sign in to continue.');
+ if(user.providerData.some(p=>p.providerId==='google.com'))await reauthenticateWithPopup(user,new GoogleAuthProvider());
+ else await reauthenticateWithCredential(user,EmailAuthProvider.credential(user.email,password));
+ await user.getIdToken(true);
+}
+export const watchInbox=(uid,callback)=>onSnapshot(doc(db,'threads',uid),s=>callback(s.data()||{}),()=>callback({}));
 export const emailLogin=(email,password)=>signInWithEmailAndPassword(auth,email.trim(),password);
 let registrationReady=Promise.resolve();
 export const waitForRegistration=()=>registrationReady;
