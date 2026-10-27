@@ -16,7 +16,6 @@ export const api=async data=>{
   if(data.unpublish===true)batch.delete(doc(db,'lessons',id));
   await batch.commit();return {saved:true};
  }
- if(data.action==='approve'){await setDoc(doc(db,'access',data.uid),{approved:data.enabled===true,updatedAt:serverTimestamp()});return {saved:true};}
  if(data.action==='setAdmin'){
   if(data.enabled){const profile=await getDoc(doc(db,'users',data.uid));if(!profile.exists())throw Error('This person needs to register first.');await setDoc(doc(db,'admins',data.uid),{email:profile.data().email,createdBy:auth.currentUser.uid,updatedAt:serverTimestamp()});}
   else await deleteDoc(doc(db,'admins',data.uid));

@@ -26,12 +26,6 @@ service cloud.firestore {
     && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedAt == request.time;
    allow delete: if owner();
   }
-  match /access/{uid} {
-   allow read: if admin() || (signed() && request.auth.uid == uid);
-   allow create,update: if admin() && exists(/databases/$(database)/documents/users/$(uid))
-    && request.resource.data.keys().hasOnly(['approved','updatedAt']) && request.resource.data.approved is bool && request.resource.data.updatedAt == request.time;
-   allow delete: if false;
-  }
   match /users/{uid} {
    allow read: if admin() || (signed() && request.auth.uid == uid);
    allow create, update: if signed() && request.auth.uid == uid

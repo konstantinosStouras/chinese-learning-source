@@ -38,12 +38,6 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
    if(d.enabled===true)await db.doc(`admins/${d.uid}`).set({email:user.email,createdAt:stamp(),createdBy:req.auth.uid});else await db.doc(`admins/${d.uid}`).delete();
    return {saved:true};
   }
-  if(d.action==='approve'){
-   if(!admin)fail('permission-denied','Administrator access is required.');
-   if(typeof d.uid!=='string'||d.uid.length>128||d.uid.includes('/'))fail('invalid-argument','Select a registered student.');
-   if(!(await db.doc(`users/${d.uid}`).get()).exists)fail('invalid-argument','The student must register first.');
-   await db.doc(`access/${d.uid}`).set({approved:d.enabled===true,updatedAt:stamp()});return {saved:true};
-  }
   if(d.action==='sharedLogin'){
    if(!owner(req.auth.token))fail('permission-denied','Only the project owner can change the shared login.');
    if(typeof d.password!=='string'||d.password.length<14||d.password.length>128)fail('invalid-argument','Use a password of 14–128 characters.');
@@ -72,7 +66,7 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
    await db.doc('settings/public').set({speechProvider:d.provider},{merge:true});return {saved:true};
   }
   if(d.action==='speech'){
-   if(!admin && !(req.auth.token.email_verified && (await db.doc(`access/${req.auth.uid}`).get()).data()?.approved))fail('permission-denied','Your lecturer needs to approve your account for AI speech feedback. Recording and playback are available now.');
+   if(!admin && req.auth.token.email_verified!==true)fail('permission-denied','Verify your email using the link in your inbox, then sign in again to use speech feedback.');
    if(typeof d.lessonId!=='string'||!/^(beginner|business|hsk5)-\d{2}$/.test(d.lessonId))fail('invalid-argument','Choose a published lesson.');
    const lesson=(await db.doc(`lessons/${d.lessonId}`).get()).data();
    const word=lesson?.vocabulary?.find(w=>w.id===d.wordId);
