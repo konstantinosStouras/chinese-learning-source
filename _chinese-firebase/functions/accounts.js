@@ -49,7 +49,7 @@ function createAccounts(db,auth){return {
     if(!admin&&!head.exists)fail('permission-denied','Your teaching team can start a conversation with you here.');
     if((use.data()?.count||0)>=(admin?500:100))fail('resource-exhausted','Today’s message limit has been reached. Try again tomorrow.');
     const h=head.data()||{},seq=(h.seq||0)+1,from=teacher?'admin':'user';
-    t.set(item,{body,from,senderUid:id,seq,createdAt:stamp()});
+    t.set(item,{body,from,senderUid:id,seq,createdAt:stamp(),...(teacher?{notifyEmail:true,mailStatus:'pending'}:{})});
     t.set(ref,{uid:target,seq,updatedAt:stamp(),[teacher?'lastAdminSeq':'lastUserSeq']:seq,[teacher?'adminReadSeq':'userReadSeq']:seq},{merge:true});
     t.set(quota,{uid:id,count:FieldValue.increment(1)},{merge:true});
    });return {sent:true};

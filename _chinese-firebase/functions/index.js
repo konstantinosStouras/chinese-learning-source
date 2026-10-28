@@ -1,6 +1,7 @@
 const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {onDocumentCreated}=require('firebase-functions/v2/firestore');
 const {createAccounts}=require('./accounts');
+const {createMailer,transport}=require('./mail');
 const {initializeApp}=require('firebase-admin/app');
 const {getAuth}=require('firebase-admin/auth');
 const {getFirestore,FieldValue}=require('firebase-admin/firestore');
@@ -9,6 +10,9 @@ const {validateLesson,owner}=require('./validation');
 initializeApp();
 const db=getFirestore(),secrets=new SecretManagerServiceClient();
 const accounts=createAccounts(db,getAuth());
+const readMailPassword=async()=>{const [v]=await secrets.accessSecretVersion({name:'projects/stouras-chinese/secrets/chinese-mail/versions/latest'});return v.payload.data.toString();};
+const notifyMessage=createMailer(db,getAuth(),readMailPassword);
+exports.notifyChineseMessage=onDocumentCreated({document:'threads/{uid}/items/{messageId}',region:'europe-west1',retry:true,maxInstances:2,memory:'256MiB',cpu:'gcf_gen1',timeoutSeconds:90},event=>notifyMessage(event.data.ref));
 exports.purgeChineseAccount=onDocumentCreated({document:'accountDeletions/{uid}',region:'europe-west1',retry:true,maxInstances:2,memory:'256MiB',cpu:'gcf_gen1',timeoutSeconds:540},event=>accounts.purge(event.params.uid));
 const project='stouras-chinese';
 const stamp=()=>FieldValue.serverTimestamp();
@@ -31,6 +35,20 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
   const accountResult=await accounts.handle(d,req.auth,admin,owner(req.auth.token));
   if(accountResult!==null)return accountResult;
   if(d.action==='role')return {admin,owner:owner(req.auth.token)};
+  if(d.action==='saveMail'){
+   if(!owner(req.auth.token))fail('permission-denied','Only the owner can connect the email sender.');
+   const password=String(d.password||'').replace(/\s/g,'');
+   if(!/^[a-zA-Z0-9]{16}$/.test(password))fail('invalid-argument','Enter the 16-character Gmail app password, not your normal Google password.');
+   const smtp=transport(password);try{await smtp.verify();}catch{fail('failed-precondition','Gmail did not accept this app password. Create one for kstouras@gmail.com and try again.');}finally{smtp.close();}
+   await secrets.addSecretVersion({parent:'projects/stouras-chinese/secrets/chinese-mail',payload:{data:Buffer.from(password)}});
+   await db.doc('settings/public').set({mailConfigured:true,mailEnabled:true},{merge:true});return {saved:true};
+  }
+  if(d.action==='setMail'){
+   if(!owner(req.auth.token))fail('permission-denied','Only the owner can change email delivery.');
+   if(typeof d.enabled!=='boolean')fail('invalid-argument','Choose whether emails are enabled.');
+   if(d.enabled)await readMailPassword();
+   await db.doc('settings/public').set({mailEnabled:d.enabled},{merge:true});return {saved:true};
+  }
   if(d.action==='saveLesson'){
    if(!admin)fail('permission-denied','Administrator access is required.');
    let lesson;try{lesson=validateLesson({...d.lesson,published:d.publish===true});}catch(e){fail('invalid-argument',e.message);}
