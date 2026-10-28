@@ -21,3 +21,40 @@
 .practice-history{margin-top:24px;border-top:1px solid #dfe5d7;padding-top:18px}.practice-history summary{cursor:pointer;font-weight:600;padding:8px 0}.people-panel .practice-history .table-wrap{overflow-x:auto}
 .notification-choice{display:flex;align-items:flex-start;gap:10px;margin-top:22px;line-height:1.5}.notification-choice input{width:18px;height:18px;min-height:18px;margin-top:3px;flex-shrink:0;accent-color:#163f35}
 .speech-review{text-align:left;margin:30px auto 10px;max-width:660px;scroll-margin-top:24px}.speech-review-heading{display:flex;flex-wrap:wrap;gap:16px;align-items:center;justify-content:space-between}.speech-review h3{font-size:24px;margin:8px 0}.speech-review .green-label{font-size:10px}.speech-steps{list-style:none;padding:0;margin:20px 0;display:grid;gap:16px}.speech-step{display:grid;grid-template-columns:30px minmax(0,1fr);gap:14px;padding:23px;background:#fffef9;border:1px solid #dce4d7;border-radius:18px}.speech-step:first-child{background:#edf3e7;border-color:#d4e0c9}.speech-step-number{width:30px;height:30px;display:grid;place-items:center;border-radius:50%;background:#163f35;color:white;font-size:13px;font-weight:700}.speech-step h4{font-size:18px;margin:2px 0 16px}.speech-step p{font-size:14px;line-height:1.75;margin:12px 0;overflow-wrap:anywhere}.speech-step .small{font-size:12px}.speech-target{display:flex;align-items:center;flex-wrap:wrap;gap:20px}.speech-target-hanzi{font-size:54px;line-height:1.4}.speech-target-pinyin{display:block;font-size:26px;font-weight:500;overflow-wrap:anywhere}.speech-target div>span{display:block;font-size:13px;color:var(--muted);margin-top:5px}.speech-step .audio-player{display:block;width:100%;max-width:100%;margin:10px 0}.speech-heard{padding:12px 15px;border-radius:10px;background:#f4f5ef}.speech-teacher-tip{border-left:3px solid #8fa56e;padding:4px 15px;margin:18px 0}.speech-teacher-tip p{margin:5px 0}.tone-guidance{border-top:1px solid #dce4d7;padding-top:15px;margin-top:20px}.tone-guidance h5{font-size:15px;margin:0 0 10px}.tone-label{font-size:11px;padding:3px 8px;background:#eaf0e3;border-radius:20px;margin-left:6px}.speech-step .scores{margin:20px 0}.speech-step .btn{white-space:normal;min-height:44px}.speech-review-heading .btn{min-height:44px}@media(max-width:600px){.speech-step{grid-template-columns:25px minmax(0,1fr);padding:16px 12px;gap:10px}.speech-step-number{width:25px;height:25px}.speech-review-heading .btn{width:100%}.speech-target{gap:12px}.speech-target-hanzi{font-size:44px}.speech-target-pinyin{font-size:23px}.speech-step .scores{gap:6px}.speech-step .score strong{font-size:25px}}
+
+/* Consistent button labels and action groups at every panel width. */
+.btn{min-width:0;max-width:100%;line-height:1.4;text-align:center;white-space:normal;overflow-wrap:break-word}
+.btn.small{min-height:40px}
+.btn.text{padding-inline:12px}
+.btn.danger{padding-inline:17px}
+.btn.danger:hover{background:#842e2e;border-color:#842e2e;color:#fff}
+.btn.danger-outline{background:transparent;border-color:#ddb8b2;color:#92382e}
+.btn.danger-outline:hover{background:#f9ece8;border-color:#bd8177;color:#772c24}
+.btn:disabled{transform:none}
+.hero-actions,.button-row{flex-wrap:wrap;align-items:center}
+.button-row>.btn{flex-shrink:0}
+.editor{container-type:inline-size;container-name:lesson-editor}
+.editor-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:stretch}
+.editor-actions>.btn{width:100%;min-height:48px;padding:12px 14px;margin:0}
+@container lesson-editor (min-width:600px){.editor-actions{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@container lesson-editor (max-width:290px){.editor-actions{grid-template-columns:1fr}}
+.person-actions .btn{white-space:normal;flex:1 1 105px}
+.speech-review-heading{justify-content:flex-start;gap:10px}
+.speech-review-heading>div{flex-basis:100%}
+@media(max-width:640px){
+ .btn.small,.topnav .btn,.auth-switch button,.tone-keys button,.weekbutton{min-height:44px}
+ .tone-keys button{min-width:40px}
+ .practice-top{flex-wrap:wrap}
+ .practice-top h1{order:3;flex-basis:100%;text-align:center}
+ .practice-bottom{flex-wrap:wrap}
+ .practice-bottom>.button-row{margin-left:auto}
+ .page-head{flex-wrap:wrap}
+ .auth-text-link,.auth-foot button{min-height:44px}
+ .speech-review-heading>.btn{width:100%}
+}
+.sidebar,.admin-weeks,.editor{min-width:0;max-width:100%}
+@media(max-width:640px){.module-layout,.admin-curriculum,.practice-layout{grid-template-columns:minmax(0,1fr)}}
+dialog .close{display:grid;place-items:center;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;line-height:1}
+.password-field button{top:2px;bottom:2px;min-height:44px}
+.account-actions{gap:8px;margin:20px 0}
+dialog>.row{margin-top:20px}
