@@ -58,3 +58,10 @@ dialog .close{display:grid;place-items:center;width:44px;height:44px;min-width:4
 .password-field button{top:2px;bottom:2px;min-height:44px}
 .account-actions{gap:8px;margin:20px 0}
 dialog>.row{margin-top:20px}
+
+/* The whole vocabulary card opens practice on its selected word. */
+button.word-card{width:100%;color:var(--green);font:inherit;cursor:pointer;transition:border-color .15s,background .15s,box-shadow .15s,transform .15s}
+button.word-card:hover{border-color:#79916c;background:#f0f5e9;box-shadow:0 4px 12px #163f350b;transform:translateY(-2px)}
+button.word-card:active{transform:translateY(0);background:#e8f0df}
+.vocabulary-help{margin:0 0 12px}
+.vocabulary-help+.word-grid{margin-top:12px}
