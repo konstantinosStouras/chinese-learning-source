@@ -8,6 +8,11 @@ function fixture(){
  return {run,values,counts:()=>({calls,charged})};
 }
 const request={lessonId:'beginner-01',wordId:'word-1'},user={uid:'learner',token:{email_verified:true}};
+test('generated example accepts tone-matching homophones but rejects different tones or extra words',()=>{
+ const target={hanzi:'午',pinyin:'wǔ'};
+ assert.equal(model.matchesTarget('午。',target),true);assert.equal(model.matchesTarget('五',target),true);
+ assert.equal(model.matchesTarget('无',target),false);assert.equal(model.matchesTarget('下午',target),false);assert.equal(model.matchesTarget('',target),false);
+});
 test('pronunciation endpoint checks verification, published exercise and enabled provider',async()=>{
  const f=fixture();await assert.rejects(()=>f.run(request,{...user,token:{}},false),e=>e.code==='permission-denied');
  await assert.rejects(()=>f.run({...request,wordId:'arbitrary text'},user,false),e=>e.code==='failed-precondition');
