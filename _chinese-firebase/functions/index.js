@@ -2,6 +2,7 @@ const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {onDocumentCreated}=require('firebase-functions/v2/firestore');
 const {createAccounts}=require('./accounts');
 const {createMailer,transport}=require('./mail');
+const {createPronunciation}=require('./model-audio');
 const {initializeApp}=require('firebase-admin/app');
 const {getAuth}=require('firebase-admin/auth');
 const {getFirestore,FieldValue}=require('firebase-admin/firestore');
@@ -23,6 +24,7 @@ async function limits(uid){
  const day=new Date().toISOString().slice(0,10),refs=[db.doc(`usage/${day}-${uid}`),db.doc(`usage/${day}-total`)];
  await db.runTransaction(async t=>{const snapshots=await Promise.all(refs.map(r=>t.get(r)));if((snapshots[0].data()?.count||0)>=40||(snapshots[1].data()?.count||0)>=300)fail('resource-exhausted','Today’s speech practice limit has been reached. You can still practise writing and pinyin.');refs.forEach((r,i)=>t.set(r,{...(i===0?{uid}:{}),count:FieldValue.increment(1),updatedAt:stamp()},{merge:true}));});
 }
+const pronunciation=createPronunciation(db,secret,limits);
 exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,memory:'256MiB',cpu:'gcf_gen1',timeoutSeconds:90,cors:['https://stouras.com','https://www.stouras.com','https://stouras-chinese.web.app',/^http:\/\/localhost(:\d+)?$/]},async req=>{
  if(!req.auth)fail('unauthenticated','Sign in to continue.');
  const d=req.data||{};
@@ -94,6 +96,7 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
    if(d.provider!=='off')await secret(d.provider);
    await db.doc('settings/public').set({speechProvider:d.provider},{merge:true});return {saved:true};
   }
+  if(d.action==='pronunciation')return await pronunciation(d,req.auth,admin);
   if(d.action==='speech'){
    if(!admin && req.auth.token.email_verified!==true)fail('permission-denied','Verify your email using the link in your inbox, then sign in again to use speech feedback.');
    if(typeof d.lessonId!=='string'||!/^(beginner|business|hsk5)-\d{2}$/.test(d.lessonId))fail('invalid-argument','Choose a published lesson.');
