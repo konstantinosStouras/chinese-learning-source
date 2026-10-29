@@ -3,19 +3,10 @@ import {getAuth,GoogleAuthProvider,EmailAuthProvider,reauthenticateWithCredentia
 import {getFirestore,collection,doc,getDoc,getDocs,setDoc,addDoc,deleteDoc,writeBatch,query,where,orderBy,limit,serverTimestamp,onSnapshot} from 'firebase/firestore';
 import {getFunctions,httpsCallable} from 'firebase/functions';
 import config from './firebase-config.json';
-import validation from '../_chinese-firebase/functions/validation.js';
 export const app=initializeApp(config),auth=getAuth(app),db=getFirestore(app);
 const call=httpsCallable(getFunctions(app,'europe-west1'),'chineseApi',{timeout:90000});
 export const api=async data=>{
  if(!auth.currentUser&&data.action!=='submitFeedback')throw Error('Sign in to continue.');
- if(data.action==='saveLesson'){
-  const lesson=validation.validateLesson({...data.lesson,published:data.publish===true});
-  const id=`${lesson.moduleId}-${String(lesson.week).padStart(2,'0')}`,value={...lesson,updatedBy:auth.currentUser.uid,updatedAt:serverTimestamp()},batch=writeBatch(db);
-  batch.set(doc(db,'drafts',id),value);
-  if(data.publish===true)batch.set(doc(db,'lessons',id),{...value,published:true});
-  if(data.unpublish===true)batch.delete(doc(db,'lessons',id));
-  await batch.commit();return {saved:true};
- }
  return (await call(data)).data;
 };
 export const googleLogin=()=>signInWithPopup(auth,new GoogleAuthProvider());

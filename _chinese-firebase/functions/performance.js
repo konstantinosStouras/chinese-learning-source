@@ -2,6 +2,7 @@ const {HttpsError}=require('firebase-functions/v2/https');
 const {MODULES}=require('./validation');
 function bucket(){return {attempts:0,writing:{attempts:0,noRetry:0,retries:0},pinyin:{attempts:0,correct:0},speaking:{reviews:0,recognized:0,recognitionChecks:0,accuracyTotal:0,accuracyChecks:0}};}
 function addAttempt(b,a){
+ if(['writing','pinyin'].includes(a.kind)&&Number.isFinite(a.score)&&a.score>=0&&a.score<=10){b[a.kind].scoreTotal=(b[a.kind].scoreTotal||0)+a.score;b[a.kind].scoredAttempts=(b[a.kind].scoredAttempts||0)+1;}
  if(a.kind==='writing'){b.attempts++;b.writing.attempts++;const n=Number.isFinite(a.mistakes)?Math.max(0,a.mistakes):0;b.writing.retries+=n;if(n===0)b.writing.noRetry++;}
  if(a.kind==='pinyin'){b.attempts++;b.pinyin.attempts++;if(a.correct===true)b.pinyin.correct++;}
  // Old speaking attempt.correct means completion, not pronunciation success.

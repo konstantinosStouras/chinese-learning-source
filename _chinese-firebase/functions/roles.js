@@ -8,6 +8,6 @@ function roles(auth,assigned=false){
 function authorize(action,access){
  const technical=['setAdmin','setRole','saveMail','setMail','sharedLogin','saveProvider','setProvider','listFeedback','getFeedback','setFeedbackStatus'];
  if(technical.includes(action)&&!access.admin)throw new HttpsError('permission-denied','Only the administrator can use this feature.');
- if(['saveLesson','listUsers','setModules'].includes(action)&&!access.canTeach)throw new HttpsError('permission-denied','Teacher access is required.');
+ if(['saveLesson','listUsers','setModules','getCoachSettings','saveCoachSettings','assignLessonCoach','previewCoach'].includes(action)&&!access.canTeach)throw new HttpsError('permission-denied','Teacher access is required.');
 }
 module.exports={roles,authorize};

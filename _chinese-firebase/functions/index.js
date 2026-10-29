@@ -10,6 +10,8 @@ const {getFirestore,FieldValue}=require('firebase-admin/firestore');
 const {SecretManagerServiceClient}=require('@google-cloud/secret-manager');
 const {validateLesson,owner}=require('./validation');
 const {roles,authorize}=require('./roles');
+const {createCoach}=require('./coach');
+const practiceCore=require('./practice-core');
 initializeApp();
 const db=getFirestore(),secrets=new SecretManagerServiceClient();
 const accounts=createAccounts(db,getAuth());
@@ -29,6 +31,7 @@ async function limits(uid){
  await db.runTransaction(async t=>{const snapshots=await Promise.all(refs.map(r=>t.get(r)));if((snapshots[0].data()?.count||0)>=40||(snapshots[1].data()?.count||0)>=300)fail('resource-exhausted','Today’s speech practice limit has been reached. You can still practise writing and pinyin.');refs.forEach((r,i)=>t.set(r,{...(i===0?{uid}:{}),count:FieldValue.increment(1),updatedAt:stamp()},{merge:true}));});
 }
 const pronunciation=createPronunciation(db,secret,limits);
+const coach=createCoach(db,secret,limits);
 exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,memory:'256MiB',cpu:'gcf_gen1',timeoutSeconds:90,cors:['https://stouras.com','https://www.stouras.com','https://stouras-chinese.web.app',/^http:\/\/localhost(:\d+)?$/]},async req=>{
  const d=req.data||{};
  if(d.action==='submitFeedback')return siteFeedback.submit(d,req);
@@ -40,6 +43,9 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
   if(Number.isFinite(validAfter)&&req.auth.token.auth_time<validAfter)fail('unauthenticated','Please sign in again.');
   const access=await accessFor(req.auth),{admin}=access;
   authorize(d.action,access);
+  const coachResult=await coach.handle(d,req.auth,access);
+  if(coachResult!==null)return coachResult;
+  if(d.action==='enrichPracticeFeedback')return coach.enrichAttempt(d,req.auth,access);
   const feedbackResult=await siteFeedback.handle(d,admin);
   if(feedbackResult!==null)return feedbackResult;
   const accountResult=await accounts.handle(d,req.auth,admin,owner(req.auth.token),access.canTeach);
@@ -61,9 +67,9 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
    await db.doc('settings/public').set({mailEnabled:d.enabled},{merge:true});return {saved:true};
   }
   if(d.action==='saveLesson'){
-   if(!admin)fail('permission-denied','Administrator access is required.');
+   if(!access.canTeach)fail('permission-denied','Teacher access is required.');
    let lesson;try{lesson=validateLesson({...d.lesson,published:d.publish===true});}catch(e){fail('invalid-argument',e.message);}
-   const id=`${lesson.moduleId}-${String(lesson.week).padStart(2,'0')}`,data={...lesson,updatedAt:stamp(),updatedBy:req.auth.uid};
+   const id=`${lesson.moduleId}-${String(lesson.week).padStart(2,'0')}`,existing=(await db.doc(`lessons/${id}`).get()).data(),data={...lesson,coachTeacherId:existing?.coachTeacherId||req.auth.uid,updatedAt:stamp(),updatedBy:req.auth.uid};
    const batch=db.batch();batch.set(db.doc(`drafts/${id}`),data);
    if(d.publish===true)batch.set(db.doc(`lessons/${id}`),{...data,published:true});
    if(d.unpublish===true)batch.delete(db.doc(`lessons/${id}`));
@@ -137,6 +143,8 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
     const assessment=best.PronunciationAssessment||best;
     result={provider,transcript:String(data.DisplayText||best.Display||''),accuracy:assessment.AccuracyScore??null,fluency:assessment.FluencyScore??null,completeness:assessment.CompletenessScore??null,words:(best.Words||[]).map(w=>({word:w.Word,accuracy:(w.PronunciationAssessment||w).AccuracyScore??null,error:(w.PronunciationAssessment||w).ErrorType||'None'})),hint:word.hint,notice:'Automated practice feedback, not an assessed grade. These scores do not isolate Mandarin tone accuracy; review tones with your lecturer.'};
    }
+   const selection=await coach.resolve(lesson),checked=practiceCore.speakingFeedback(result);
+   result.coach={...checked,message:practiceCore.coachText(checked,selection),source:'practice-rules',profile:selection};
    await db.runTransaction(async t=>{if((await t.get(db.doc(`accountDeletions/${req.auth.uid}`))).exists)fail('permission-denied','This account is being deleted.');t.create(db.collection('speechFeedback').doc(),{uid:req.auth.uid,lessonId:d.lessonId,hanzi:word.hanzi,provider,result,createdAt:stamp()});});
    return result;
   }

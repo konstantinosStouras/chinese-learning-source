@@ -1,4 +1,5 @@
 import {escapeHtml as e} from './core.mjs';
+import practiceCore from '../_chinese-firebase/functions/practice-core.js';
 
 // Describe the target's written tones, never infer a learner's tone from transcription.
 export function toneGuidance(pinyin){
@@ -33,6 +34,7 @@ export function speakingVerdict(word,result){
 
 export function speechFeedbackView(word,result,url){
  const verdict=speakingVerdict(word,result);
+ const coaching=result.coach||practiceCore.speakingFeedback(result);
  const issues=(result.words||[]).filter(w=>w.error&&w.error!=='None');
  const guidance=toneGuidance(word.pinyin);
  const assessment=result.provider==='azure';
@@ -42,7 +44,7 @@ export function speechFeedbackView(word,result,url){
     : result.matched?'The recognised words match the target. Now compare the sounds and pitch in your recording with the model. A matching transcript does not confirm correct tones.'
     : 'The recognised words differ from the target. Listen to the model, say the pinyin slowly, then try the full word again. Recognition alone cannot tell us which sound or tone you need to change.';
  return `<section class="speech-review" aria-label="Your pronunciation feedback"><div class="speech-review-heading"><div><span class="green-label">LISTEN. COMPARE. TRY AGAIN.</span><h3>Your speaking feedback</h3></div><button class="btn primary small" data-action="compare-voice">Play model, then my voice</button><button class="btn small" data-action="stop-voice">Stop audio</button></div><p id="comparison-status" class="small muted" role="status">Follow the three steps below.</p>
- <div class="speaking-verdict speaking-verdict-${verdict.level}" role="status"><span class="green-label">HOW YOU DID</span><div class="speaking-verdict-heading"><strong>${e(verdict.label)}</strong>${verdict.score!==undefined?`<span class="speaking-verdict-score">${verdict.score.toFixed(1)}<small> / 10</small></span>`:''}</div><p>${e(verdict.detail)}</p></div>
+ <div class="speaking-verdict speaking-verdict-${verdict.level}" role="status"><span class="green-label">HOW YOU DID · ${e(coaching.basis)}</span><div class="speaking-verdict-heading"><strong>${e(verdict.label)}</strong><span class="speaking-verdict-score">${coaching.score.toFixed(1)}<small> / 10</small></span></div><p>${e(verdict.detail)}</p><p>${e(coaching.message||coaching.next)}</p><p class="small muted">${e(coaching.rubric)}</p></div>
  <ol class="speech-steps">
  <li class="speech-step"><span class="speech-step-number" aria-hidden="true">1</span><div><h4>Correct pronunciation</h4><div class="speech-target"><span lang="zh-CN" class="speech-target-hanzi">${e(word.hanzi)}</span><div><strong class="speech-target-pinyin" lang="zh-Latn">${e(word.pinyin)}</strong><span>${e(word.meaning)}</span></div></div><p class="small muted">Pinyin is the spelling of the sounds. Its tone marks show how your pitch moves.</p><button class="btn small" data-action="listen">Listen to the correct pronunciation</button><div id="model-audio-output"></div></div></li>
  <li class="speech-step"><span class="speech-step-number" aria-hidden="true">2</span><div><h4>Your recording</h4><p class="small muted">Listen to the exact attempt you just submitted.</p><audio id="feedback-recording" class="audio-player" controls preload="metadata" src="${e(url)}" aria-label="Replay your submitted pronunciation"></audio></div></li>

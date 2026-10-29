@@ -92,7 +92,7 @@ function createAccounts(db,auth){return {
    const remaining=await thread.ref.collection('items').orderBy('seq','desc').get();
    await thread.ref.update({lastAdminSeq:remaining.docs.find(d=>d.data().from==='admin')?.data().seq||0,lastUserSeq:remaining.docs.find(d=>d.data().from==='user')?.data().seq||0});
   }
-  const batch=db.batch();for(const name of ['users','admins','access','enrollments'])batch.delete(db.doc(`${name}/${id}`));await batch.commit();
+  const batch=db.batch();for(const name of ['users','admins','access','enrollments','coachProfiles'])batch.delete(db.doc(`${name}/${id}`));await batch.commit();
   try{await auth.deleteUser(id);}catch(e){if(e.code!=='auth/user-not-found')throw e;}
   await order.set({status:'done',completedAt:stamp()});
  }
