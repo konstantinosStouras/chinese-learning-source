@@ -1,6 +1,7 @@
 const {onCall,HttpsError}=require('firebase-functions/v2/https');
 const {onDocumentCreated}=require('firebase-functions/v2/firestore');
 const {createAccounts}=require('./accounts');
+const feedback=require('./feedback').createFeedback;
 const {createMailer,transport}=require('./mail');
 const {createPronunciation}=require('./model-audio');
 const {initializeApp}=require('firebase-admin/app');
@@ -11,6 +12,7 @@ const {validateLesson,owner}=require('./validation');
 initializeApp();
 const db=getFirestore(),secrets=new SecretManagerServiceClient();
 const accounts=createAccounts(db,getAuth());
+const siteFeedback=feedback(db);
 const readMailPassword=async()=>{const [v]=await secrets.accessSecretVersion({name:'projects/stouras-chinese/secrets/chinese-mail/versions/latest'});return v.payload.data.toString();};
 const notifyMessage=createMailer(db,getAuth(),readMailPassword);
 exports.notifyChineseMessage=onDocumentCreated({document:'threads/{uid}/items/{messageId}',region:'europe-west1',retry:true,maxInstances:2,memory:'256MiB',cpu:'gcf_gen1',timeoutSeconds:90},event=>notifyMessage(event.data.ref));
@@ -26,14 +28,17 @@ async function limits(uid){
 }
 const pronunciation=createPronunciation(db,secret,limits);
 exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,memory:'256MiB',cpu:'gcf_gen1',timeoutSeconds:90,cors:['https://stouras.com','https://www.stouras.com','https://stouras-chinese.web.app',/^http:\/\/localhost(:\d+)?$/]},async req=>{
- if(!req.auth)fail('unauthenticated','Sign in to continue.');
  const d=req.data||{};
+ if(d.action==='submitFeedback')return siteFeedback.submit(d,req);
+ if(!req.auth)fail('unauthenticated','Sign in to continue.');
  try{
   const [record,deletion]=await Promise.all([getAuth().getUser(req.auth.uid),db.doc(`accountDeletions/${req.auth.uid}`).get()]);
   if(record.disabled||deletion.exists)fail('permission-denied','This account is being deleted or has been disabled.');
   const validAfter=Date.parse(record.tokensValidAfterTime||'')/1000;
   if(Number.isFinite(validAfter)&&req.auth.token.auth_time<validAfter)fail('unauthenticated','Please sign in again.');
   const admin=await isAdmin(req.auth);
+  const feedbackResult=await siteFeedback.handle(d,admin);
+  if(feedbackResult!==null)return feedbackResult;
   const accountResult=await accounts.handle(d,req.auth,admin,owner(req.auth.token));
   if(accountResult!==null)return accountResult;
   if(d.action==='role')return {admin,owner:owner(req.auth.token)};

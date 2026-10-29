@@ -73,3 +73,9 @@ A device Mandarin voice is preferred. Without one, the verified learner can requ
 Tone guidance describes the written target; transcription cannot identify an individual learner's tone error. Lecturer hints remain the source for sound-specific coaching. Tests cover feedback ordering, escaping, tone notation, playback order/cancellation, autoplay fallback, verified access, provider gating and example caching. A live model request produced a valid Mandarin WAV; browser QA used a synthetic recording and real example audio.
 
 References: https://developers.openai.com/api/docs/guides/realtime-conversations and https://www.polyu.edu.hk/bepth/introduction-to-phonetics/tones/basic-tones/?sc_lang=en
+
+## Website feedback
+
+Visitors can open Feedback in the header or footer (direct link: /chinese/#feedback). No account is required. They can submit text, up to five screenshots, or both, with optional name and reply email. The browser accepts PNG/JPEG/WebP under 10 MB and converts them to bounded JPEGs before upload; previews support removal, paste and drag/drop. A retry reuses its request ID to prevent duplicate submissions.
+
+Teaching administrators open Feedback inbox in the teaching space to read submissions and screenshots and mark items closed/reopen them. Replies use the optional supplied email address. No automatic feedback email is sent. Records and image documents are server-only under siteFeedback; existing default-deny Firestore rules prevent client reads and writes. The callable checks administrator authorization for reading and changing status. Submission is limited to ten per network per UTC day and 200 globally. Only a daily hashed IP is kept in quota document IDs, not raw IPs. Website feedback is separate from account/practice records and is not removed by account deletion.
