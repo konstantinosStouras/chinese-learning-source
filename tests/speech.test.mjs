@@ -1,7 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {speechFeedbackView,toneGuidance} from '../src/speech-view.mjs';
+import {speechFeedbackView,toneGuidance,speakingVerdict} from '../src/speech-view.mjs';
 import {createSpeechPlayback} from '../src/speech-playback.mjs';
+
+test('verdict gives actionable recognition feedback without inventing pronunciation scores',()=>{
+ const word={hanzi:'你好'};
+ assert.equal(speakingVerdict(word,{transcript:'你好！',matched:true}).level,'good');
+ assert.equal(speakingVerdict(word,{transcript:'你',matched:false}).level,'close');
+ assert.equal(speakingVerdict(word,{transcript:'再见',matched:false}).level,'retry');
+ assert.equal(speakingVerdict(word,{transcript:''}).level,'retry');
+ assert.equal(speakingVerdict(word,{transcript:'你好',matched:true}).score,undefined);
+ assert.equal(speakingVerdict(word,{provider:'azure',accuracy:85}).score,8.5);
+ assert.equal(speakingVerdict(word,{provider:'azure',accuracy:0}).score,0);
+ assert.equal(speakingVerdict(word,{provider:'azure',accuracy:null}).score,undefined);
+ assert.equal(speakingVerdict(word,{provider:'azure',accuracy:65}).level,'close');
+});
 
 test('feedback presents target, submitted audio and honest English guidance in order',()=>{
  const html=speechFeedbackView({hanzi:'午',pinyin:'wǔ',meaning:'noon',hint:'Keep the third tone low.'},{provider:'openai',transcript:'五',matched:false},'blob:test');
