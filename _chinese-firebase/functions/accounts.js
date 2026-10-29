@@ -11,16 +11,23 @@ async function active(db,auth,id){
  if(user.disabled)fail('permission-denied','This account is disabled.');return user;
 }
 function createAccounts(db,auth){return {
- async handle(d,caller,admin,isOwner){
+ async handle(d,caller,admin,isOwner,canTeach=admin){
   const id=caller.uid;
   if(d.action==='listUsers'){
    if(!admin)fail('permission-denied','Administrator access is required.');
    if(d.pageToken!==undefined&&(typeof d.pageToken!=='string'||d.pageToken.length>2048))fail('invalid-argument','Refresh the directory.');
    const page=await auth.listUsers(100,d.pageToken||undefined);
    const users=page.users.filter(u=>u.uid!=='shared-teacher');
-   const refs=users.flatMap(u=>['users','admins','threads','accountDeletions'].map(c=>db.doc(`${c}/${u.uid}`)));
+   const refs=users.flatMap(u=>['users','admins','threads','accountDeletions','enrollments'].map(c=>db.doc(`${c}/${u.uid}`)));
    const docs=refs.length?await db.getAll(...refs):[];
-   return {users:users.map((u,i)=>{const p=docs[i*4].data()||{},thread=docs[i*4+2].data()||{};return {id:u.uid,name:p.name||u.displayName||'Learner',firstName:p.firstName||'',lastName:p.lastName||'',email:u.email||'',moduleId:p.moduleId||'',verified:u.emailVerified,disabled:u.disabled,deleting:docs[i*4+3].exists,admin:docs[i*4+1].exists||u.email===OWNER,createdAt:u.metadata.creationTime,lastSignIn:u.metadata.lastSignInTime,needsReply:(thread.lastUserSeq||0)>(thread.adminReadSeq||0)};}),nextPageToken:page.pageToken||null};
+   return {users:users.map((u,i)=>{const p=docs[i*5].data()||{},thread=docs[i*5+2].data()||{};return {id:u.uid,name:p.name||u.displayName||'Learner',firstName:p.firstName||'',lastName:p.lastName||'',email:u.email||'',moduleId:p.moduleId||'',moduleIds:docs[i*5+4].data()?.modules||[p.moduleId||'beginner'],verified:u.emailVerified,disabled:u.disabled,deleting:docs[i*5+3].exists,admin:u.email===OWNER,teacher:docs[i*5+1].exists&&u.email!==OWNER,role:u.email===OWNER?'admin':docs[i*5+1].exists?'teacher':'student',createdAt:u.metadata.creationTime,lastSignIn:admin?u.metadata.lastSignInTime:null,needsReply:admin&&(thread.lastUserSeq||0)>(thread.adminReadSeq||0)};}),nextPageToken:page.pageToken||null};
+  }
+  if(d.action==='setModules'){
+   if(!canTeach)fail('permission-denied','Teacher access is required.');
+   const target=uid(d.uid);const person=await active(db,auth,target);
+   if(!isOwner&&person.email===OWNER)fail('permission-denied','Only the administrator can change their own modules.');
+   if(!Array.isArray(d.modules)||!d.modules.length||d.modules.length>3||new Set(d.modules).size!==d.modules.length||d.modules.some(x=>!['beginner','business','hsk5'].includes(x)))fail('invalid-argument','Choose one or more valid modules.');
+   await db.doc('enrollments/'+target).set({modules:d.modules,updatedBy:id,updatedAt:stamp()});return {saved:true};
   }
   if(['getMessages','sendMessage','readMessages'].includes(d.action)){
    const target=uid(d.uid||id),teacher=admin&&target!==id;
@@ -56,7 +63,7 @@ function createAccounts(db,auth){return {
   }
   if(d.action==='deleteAccount'){
    const target=uid(d.uid||id),self=target===id;
-   if(!self&&!admin)fail('permission-denied','Administrator access is required.');
+   if(!self&&!canTeach)fail('permission-denied','Teacher access is required.');
    recent(caller);
    if(d.confirmation!=='DELETE')fail('invalid-argument','Type DELETE to confirm.');
    if(target==='shared-teacher')fail('failed-precondition','The shared teaching account is managed in Settings.');
@@ -85,7 +92,7 @@ function createAccounts(db,auth){return {
    const remaining=await thread.ref.collection('items').orderBy('seq','desc').get();
    await thread.ref.update({lastAdminSeq:remaining.docs.find(d=>d.data().from==='admin')?.data().seq||0,lastUserSeq:remaining.docs.find(d=>d.data().from==='user')?.data().seq||0});
   }
-  const batch=db.batch();for(const name of ['users','admins','access'])batch.delete(db.doc(`${name}/${id}`));await batch.commit();
+  const batch=db.batch();for(const name of ['users','admins','access','enrollments'])batch.delete(db.doc(`${name}/${id}`));await batch.commit();
   try{await auth.deleteUser(id);}catch(e){if(e.code!=='auth/user-not-found')throw e;}
   await order.set({status:'done',completedAt:stamp()});
  }

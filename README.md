@@ -8,7 +8,7 @@ Firebase project: `stouras-chinese` (isolated from other simulations).
 
 Two main pathways with three independently editable cohorts: HSK1 beginner (15 students), Business Chinese HSK4–5 (8), and HSK5 (6). Each has 12 weeks. Week 1 contains clearly labelled demonstration content; other weeks start as unpublished drafts. Beginner samples use the seven characters in Lucy's handout. Advanced samples are original illustrative vocabulary, pending lecturer review.
 
-Student practice includes stroke-order animation and guided drawing (Hanzi Writer), pinyin with tone checking, device speech playback when a Mandarin voice is installed, 20-second microphone recordings and local playback. Registered accounts with verified email addresses can practise and save records. Registration supports Google or email/password, with first and last names. Admins manage weekly vocabulary, repetitions, hints, activities, draft/publish status and private conversations with learners. Every verified registered user can use AI feedback without lecturer approval. The owner can promote registered users and enable a shared `teacher` login by choosing a password.
+Student practice includes stroke-order animation and guided drawing (Hanzi Writer), pinyin with tone checking, device speech playback when a Mandarin voice is installed, 20-second microphone recordings and local playback. Registered accounts with verified email addresses can practise and save records. Registration supports Google or email/password, with first and last names. Admins manage weekly vocabulary, repetitions, hints, activities, draft/publish status and private conversations with learners. Every verified registered user can use AI feedback without lecturer approval. The owner can assign teacher access to registered users and enable a shared `teacher` login by choosing a password.
 
 Google sign-in automatically recognises only the verified `kstouras@gmail.com` Google account as owner. Email/password users cannot claim owner access simply by registering that address. Other admin roles are stored in a protected collection. Shared credentials never appear in source code.
 
@@ -79,3 +79,22 @@ References: https://developers.openai.com/api/docs/guides/realtime-conversations
 Visitors can open Feedback in the header or footer (direct link: /chinese/#feedback). No account is required. They can submit text, up to five screenshots, or both, with optional name and reply email. The browser accepts PNG/JPEG/WebP under 10 MB and converts them to bounded JPEGs before upload; previews support removal, paste and drag/drop. A retry reuses its request ID to prevent duplicate submissions.
 
 Teaching administrators open Feedback inbox in the teaching space to read submissions and screenshots and mark items closed/reopen them. Replies use the optional supplied email address. No automatic feedback email is sent. Records and image documents are server-only under siteFeedback; existing default-deny Firestore rules prevent client reads and writes. The callable checks administrator authorization for reading and changing status. Submission is limited to ten per network per UTC day and 200 globally. Only a daily hashed IP is kept in quota document IDs, not raw IPs. Website feedback is separate from account/practice records and is not removed by account deletion.
+
+
+## Access roles
+
+All registered accounts default to Student. The verified Google owner account (kstouras@gmail.com) is the sole Admin and inherits student and teacher access. Owner-assigned Teachers can edit, preview, publish and unpublish weekly lesson content, and use People to delete student or teacher accounts, but cannot delete the administrator, assign roles, manage API keys/providers/mail settings, read other users’ messages, or open the feedback inbox. The existing protected admins collection now stores teacher assignments; legacy entries and the shared teacher account grant only teacher access, never technical administrator access.
+
+The Admin uses People & practice → Make teacher / Make student to change assignments. Lucy Liu (lucy.liu@ucd.ie) is assigned Teacher. Authorization is enforced in the callable backend and Firestore rules as well as navigation. Teachers currently edit the shared curriculum across modules and weeks; no per-teacher week allocation is configured.
+
+
+## Account menu and photos
+
+The avatar opens a compact dropdown with profile identity, navigation and a prominent Sign out button. Profile & account settings supports a 192-pixel square custom JPEG avatar derived in the browser from PNG/JPEG/WebP (5 MB input limit); Google account photos are the default. Uploaded avatars are stored privately on the user profile and removed with account deletion. Account deletion is inside a collapsed section in profile settings and still requires reauthentication and typing DELETE.
+
+
+## Personal performance and module assignments
+
+Performance in the account dropdown shows a separate dashboard per module: twelve weekly rows and attempt-weighted module averages for writing without stroke retries, pinyin correctness, OpenAI word recognition and Azure pronunciation accuracy (when available). It uses existing attempts and speechFeedback records belonging only to the caller. Old speaking completion flags are never treated as accuracy. Empty weeks stay unscored. Suggestions highlight words with recorded retries, incorrect answers or recognition mismatches.
+
+Teachers and the administrator can assign one or more modules in People → Assign modules. Assignments are private enrollment documents and do not remove historical results or restrict existing lesson browsing. Account deletion removes enrollments too. No cross-module grade or combined score across unlike skills is calculated.

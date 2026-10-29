@@ -4,7 +4,8 @@ service cloud.firestore {
   function signed(){return request.auth != null && !exists(/databases/$(database)/documents/accountDeletions/$(request.auth.uid));}
   function owner(){return signed() && request.auth.token.email == 'kstouras@gmail.com' && request.auth.token.email_verified == true && request.auth.token.firebase.sign_in_provider == 'google.com';}
   function verified(){return signed() && (request.auth.token.email_verified == true || request.auth.uid == 'shared-teacher');}
-  function admin(){return owner() || (verified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));}
+  function admin(){return owner();}
+  function teacher(){return admin() || (verified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));}
   function lessonValid(){let d=request.resource.data;return d.keys().hasOnly(['moduleId','week','title','intro','repetitions','vocabulary','showPinyin','showMeaning','writing','speaking','pinyin','randomize','sample','published','updatedAt','updatedBy'])
    && d.moduleId in ['beginner','business','hsk5'] && d.week is int && d.week >= 1 && d.week <= 12
    && d.title is string && d.title.size() > 0 && d.title.size() <= 100
@@ -15,22 +16,25 @@ service cloud.firestore {
    && (!d.published || (d.vocabulary.size() > 0 && (d.writing || d.speaking || d.pinyin)))
    && d.updatedBy == request.auth.uid && d.updatedAt == request.time;}
   match /modules/{id} {allow read: if true; allow write: if false;}
-  match /lessons/{id} {allow read: if resource.data.published == true || admin(); allow create,update: if admin() && lessonValid() && request.resource.data.published; allow delete: if admin();}
-  match /drafts/{id} {allow read: if admin(); allow create,update: if admin() && lessonValid(); allow delete: if false;}
+  match /lessons/{id} {allow read: if resource.data.published == true || teacher(); allow create,update: if teacher() && lessonValid() && request.resource.data.published; allow delete: if teacher();}
+  match /drafts/{id} {allow read: if teacher(); allow create,update: if teacher() && lessonValid(); allow delete: if false;}
   match /settings/public {allow read: if true; allow write: if false;}
   match /admins/{uid} {
    allow read: if admin() || (signed() && request.auth.uid == uid);
    allow create,update: if owner() && exists(/databases/$(database)/documents/users/$(uid))
-    && request.resource.data.keys().hasOnly(['email','createdBy','updatedAt'])
+    && request.resource.data.keys().hasOnly(['role','email','createdBy','updatedAt'])
+    && request.resource.data.role == 'teacher'
     && request.resource.data.email == get(/databases/$(database)/documents/users/$(uid)).data.email
     && request.resource.data.createdBy == request.auth.uid && request.resource.data.updatedAt == request.time;
    allow delete: if owner();
   }
+  match /enrollments/{uid} {allow read: if admin() || (signed() && request.auth.uid == uid); allow write: if false;}
   match /users/{uid} {
    allow read: if admin() || (signed() && request.auth.uid == uid);
    allow create, update: if signed() && request.auth.uid == uid
-    && request.resource.data.keys().hasOnly(['name','firstName','lastName','email','moduleId','updatedAt','emailNotifications'])
+    && request.resource.data.keys().hasOnly(['name','firstName','lastName','email','moduleId','updatedAt','emailNotifications','photo'])
     && (!request.resource.data.keys().hasAny(['emailNotifications']) || request.resource.data.emailNotifications is bool)
+    && (!request.resource.data.keys().hasAny(['photo']) || (request.resource.data.photo is string && request.resource.data.photo.size() <= 100000 && (request.resource.data.photo == '' || request.resource.data.photo.matches('data:image/jpeg;base64,[A-Za-z0-9+/]+={0,2}'))))
     && request.resource.data.email == request.auth.token.email
     && request.resource.data.name is string && request.resource.data.name.size() <= 120
     && (!request.resource.data.keys().hasAny(['firstName','lastName']) || (request.resource.data.keys().hasAll(['firstName','lastName'])

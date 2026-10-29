@@ -9,10 +9,12 @@ const {getAuth}=require('firebase-admin/auth');
 const {getFirestore,FieldValue}=require('firebase-admin/firestore');
 const {SecretManagerServiceClient}=require('@google-cloud/secret-manager');
 const {validateLesson,owner}=require('./validation');
+const {roles,authorize}=require('./roles');
 initializeApp();
 const db=getFirestore(),secrets=new SecretManagerServiceClient();
 const accounts=createAccounts(db,getAuth());
 const siteFeedback=feedback(db);
+const performance=require('./performance').createPerformance(db);
 const readMailPassword=async()=>{const [v]=await secrets.accessSecretVersion({name:'projects/stouras-chinese/secrets/chinese-mail/versions/latest'});return v.payload.data.toString();};
 const notifyMessage=createMailer(db,getAuth(),readMailPassword);
 exports.notifyChineseMessage=onDocumentCreated({document:'threads/{uid}/items/{messageId}',region:'europe-west1',retry:true,maxInstances:2,memory:'256MiB',cpu:'gcf_gen1',timeoutSeconds:90},event=>notifyMessage(event.data.ref));
@@ -20,7 +22,7 @@ exports.purgeChineseAccount=onDocumentCreated({document:'accountDeletions/{uid}'
 const project='stouras-chinese';
 const stamp=()=>FieldValue.serverTimestamp();
 const fail=(code,message)=>{throw new HttpsError(code,message);};
-async function isAdmin(auth){return !!auth&&(owner(auth.token)||((auth.token.email_verified===true||auth.uid==='shared-teacher')&&(await db.doc(`admins/${auth.uid}`).get()).exists));}
+async function accessFor(auth){return roles(auth,(await db.doc(`admins/${auth.uid}`).get()).exists);}
 async function secret(provider){try{const [v]=await secrets.accessSecretVersion({name:`projects/${project}/secrets/chinese-${provider}/versions/latest`});return JSON.parse(v.payload.data.toString());}catch{fail('failed-precondition','Your lecturer has not connected this speech service yet.');}}
 async function limits(uid){
  const day=new Date().toISOString().slice(0,10),refs=[db.doc(`usage/${day}-${uid}`),db.doc(`usage/${day}-total`)];
@@ -36,12 +38,14 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
   if(record.disabled||deletion.exists)fail('permission-denied','This account is being deleted or has been disabled.');
   const validAfter=Date.parse(record.tokensValidAfterTime||'')/1000;
   if(Number.isFinite(validAfter)&&req.auth.token.auth_time<validAfter)fail('unauthenticated','Please sign in again.');
-  const admin=await isAdmin(req.auth);
+  const access=await accessFor(req.auth),{admin}=access;
+  authorize(d.action,access);
   const feedbackResult=await siteFeedback.handle(d,admin);
   if(feedbackResult!==null)return feedbackResult;
-  const accountResult=await accounts.handle(d,req.auth,admin,owner(req.auth.token));
+  const accountResult=await accounts.handle(d,req.auth,admin,owner(req.auth.token),access.canTeach);
   if(accountResult!==null)return accountResult;
-  if(d.action==='role')return {admin,owner:owner(req.auth.token)};
+  if(d.action==='role')return {...access,owner:admin};
+  if(d.action==='getPerformance')return performance(d,req.auth);
   if(d.action==='saveMail'){
    if(!owner(req.auth.token))fail('permission-denied','Only the owner can connect the email sender.');
    const password=String(d.password||'').replace(/\s/g,'');
@@ -65,13 +69,15 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
    if(d.unpublish===true)batch.delete(db.doc(`lessons/${id}`));
    await batch.commit();return {saved:true};
   }
-  if(d.action==='setAdmin'){
-   if(!owner(req.auth.token))fail('permission-denied','Only the project owner can appoint administrators.');
+  if(d.action==='setAdmin'||d.action==='setRole'){
+   if(!owner(req.auth.token))fail('permission-denied','Only the administrator can assign teachers.');
    if(typeof d.uid!=='string'||d.uid.length>128||d.uid.includes('/'))fail('invalid-argument','Select a registered user.');
    const user=await getAuth().getUser(d.uid);
    if(user.email==='kstouras@gmail.com')fail('invalid-argument','The project owner always retains access.');
    if(!(await db.doc(`users/${d.uid}`).get()).exists)fail('invalid-argument','This person needs to register first.');
-   if(d.enabled===true)await db.doc(`admins/${d.uid}`).set({email:user.email,createdAt:stamp(),createdBy:req.auth.uid});else await db.doc(`admins/${d.uid}`).delete();
+   const teacher=d.action==='setRole'?d.role==='teacher':d.enabled===true;
+   if(d.action==='setRole'&&!['student','teacher'].includes(d.role))fail('invalid-argument','Choose student or teacher. The owner remains the sole administrator.');
+   if(teacher)await db.doc(`admins/${d.uid}`).set({role:'teacher',email:user.email,createdAt:stamp(),createdBy:req.auth.uid});else await db.doc(`admins/${d.uid}`).delete();
    return {saved:true};
   }
   if(d.action==='sharedLogin'){
@@ -80,7 +86,7 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
    const uid='shared-teacher';
    try{await getAuth().updateUser(uid,{password:d.password,disabled:false});}catch(e){if(e.code!=='auth/user-not-found')throw e;await getAuth().createUser({uid,email:'shared-teacher@stouras-chinese.firebaseapp.com',displayName:'Shared teacher',password:d.password});}
    await getAuth().revokeRefreshTokens(uid);
-   await db.doc(`admins/${uid}`).set({email:'shared-teacher@stouras-chinese.firebaseapp.com',createdBy:req.auth.uid,updatedAt:stamp()});
+   await db.doc(`admins/${uid}`).set({role:'teacher',email:'shared-teacher@stouras-chinese.firebaseapp.com',createdBy:req.auth.uid,updatedAt:stamp()});
    await db.doc('settings/public').set({sharedLoginEnabled:true},{merge:true});return {saved:true,username:'teacher'};
   }
   if(d.action==='saveProvider'){
