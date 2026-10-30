@@ -14,7 +14,8 @@ test('account dropdown highlights sign out and keeps deletion inside account set
  assert.ok(menu.includes('account-signout'));assert.ok(menu.includes('Sign out'));
  assert.ok(!menu.includes('delete-self'));assert.ok(!menu.includes('<script>'));
  assert.ok(settings.includes('<details class="account-removal">'));assert.ok(settings.includes('data-action="delete-self"'));
- assert.ok(!menu.includes('/chinese/admin/'));assert.ok(accountMenu(user,{}, {teacher:true}).includes('/chinese/admin/'));
+ assert.ok(!menu.includes('/chinese/admin/'));assert.ok(!accountMenu(user,{}, {teacher:true}).includes('/chinese/admin/'));
+ assert.ok(menu.includes('data-action="my-messages"'));assert.ok(menu.includes('data-action="site-feedback"'));
 });
 test('teachers may queue deletion of peers and students, but never the administrator',async()=>{
  const orders=[];

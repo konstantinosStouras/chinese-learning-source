@@ -76,7 +76,7 @@ References: https://developers.openai.com/api/docs/guides/realtime-conversations
 
 ## Website feedback
 
-Visitors can open Feedback in the header or footer (direct link: /chinese/#feedback). No account is required. They can submit text, up to five screenshots, or both, with optional name and reply email. The browser accepts PNG/JPEG/WebP under 10 MB and converts them to bounded JPEGs before upload; previews support removal, paste and drag/drop. A retry reuses its request ID to prevent duplicate submissions.
+Signed-in visitors open Feedback from the top-right profile dropdown; guests use the left navigation menu (direct link: /chinese/#feedback). No account is required. They can submit text, up to five screenshots, or both, with optional name and reply email. The browser accepts PNG/JPEG/WebP under 10 MB and converts them to bounded JPEGs before upload; previews support removal, paste and drag/drop. A retry reuses its request ID to prevent duplicate submissions.
 
 Teaching administrators open Feedback inbox in the teaching space to read submissions and screenshots and mark items closed/reopen them. Replies use the optional supplied email address. No automatic feedback email is sent. Records and image documents are server-only under siteFeedback; existing default-deny Firestore rules prevent client reads and writes. The callable checks administrator authorization for reading and changing status. Submission is limited to ten per network per UTC day and 200 globally. Only a daily hashed IP is kept in quota document IDs, not raw IPs. Website feedback is separate from account/practice records and is not removed by account deletion.
 
@@ -90,7 +90,7 @@ The Admin uses People & practice → Make teacher / Make student to change assig
 
 ## Account menu and photos
 
-The avatar opens a compact dropdown with profile identity, navigation and a prominent Sign out button. Profile & account settings supports a 192-pixel square custom JPEG avatar derived in the browser from PNG/JPEG/WebP (5 MB input limit); Google account photos are the default. Uploaded avatars are stored privately on the user profile and removed with account deletion. Account deletion is inside a collapsed section in profile settings and still requires reauthentication and typing DELETE.
+The top-right avatar opens a compact dropdown with profile identity, Messages, Feedback, Edit profile and a prominent Sign out button. Unread messages are marked on the avatar and Messages entry. A left hamburger button opens the main navigation, including learning, performance, role-appropriate teaching links and privacy. The navigation drawer closes with its close button, Escape, a backdrop click or link selection; native dialog focus handling keeps keyboard focus inside while it is open. Profile & account settings supports a 192-pixel square custom JPEG avatar derived in the browser from PNG/JPEG/WebP (5 MB input limit); Google account photos are the default. Uploaded avatars are stored privately on the user profile and removed with account deletion. Account deletion is inside a collapsed section in profile settings and still requires reauthentication and typing DELETE.
 
 
 ## Personal performance and module assignments

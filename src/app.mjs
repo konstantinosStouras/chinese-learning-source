@@ -1,6 +1,7 @@
 import * as F from './firebase.mjs';
 import {performanceView} from './performance-view.mjs';
-import {avatar,accountMenu,accountSettings,prepareAvatar} from './account-view.mjs';
+import {accountMenu,accountSettings,prepareAvatar} from './account-view.mjs';
+import {navigationHeader} from './navigation-view.mjs';
 import {initFeedback} from './site-feedback.mjs';
 import HanziWriter from 'hanzi-writer';
 import {modules,makeLesson,lessonId} from './curriculum.mjs';
@@ -38,14 +39,14 @@ function currentSpeech(p,index,take,request){return S.practice===p&&p.index===in
 function toast(message){const t=document.querySelector('#toast');t.textContent=message;t.classList.add('visible');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('visible'),6000);}
 function message(error){const code=error?.code||'';if(code.startsWith('auth/'))return authError(error);if(code.includes('popup-closed'))return 'Sign-in was cancelled. You can try again.';if(code.includes('popup-blocked'))return 'Allow the Google sign-in pop-up for this site, then try again.';if(code.includes('invalid-credential')||code.includes('wrong-password'))return 'The username or password is incorrect.';if(code.includes('network'))return 'The connection was interrupted. Check your internet connection and try again.';return String(error?.message||'Something went wrong. Please try again.').replace(/^Firebase:\s*/,'').replace(/\s*\(auth\/[^)]+\)\.?$/,'');}
 async function run(fn,button){if(button)button.disabled=true;try{return await fn();}catch(error){toast(message(error));return null;}finally{if(button?.isConnected)button.disabled=false;}}
-function modal(html){closeAccountMenu();dialog.classList.remove('auth-dialog','message-modal');dialog.removeAttribute('aria-labelledby');dialog.innerHTML=`<button class="close" data-action="close-dialog" aria-label="Close dialog">×</button>${html}`;if(!dialog.open)dialog.showModal();}
+function modal(html){closeNavigation();closeAccountMenu();dialog.classList.remove('auth-dialog','message-modal');dialog.removeAttribute('aria-labelledby');dialog.innerHTML=`<button class="close" data-action="close-dialog" aria-label="Close dialog">×</button>${html}`;if(!dialog.open)dialog.showModal();}
 function authModal(mode='signin'){S.authMode=mode;modal(authView(mode));dialog.classList.add('auth-dialog');dialog.setAttribute('aria-labelledby','auth-title');}
 function showAuth(mode='signin'){S.authMode=mode;if(adminPage&&!S.user&&!dialog.open)render();else authModal(mode);}
 function closeAccountMenu(){document.querySelector('#account-menu-slot')?.replaceChildren();document.querySelector('[data-action="account"]')?.setAttribute('aria-expanded','false');}
-function accountModal(){const slot=document.querySelector('#account-menu-slot');if(!slot)return;if(slot.childElementCount){closeAccountMenu();return;}slot.innerHTML=accountMenu(S.user,S.profile,S);document.querySelector('[data-action="account"]')?.setAttribute('aria-expanded','true');slot.querySelector('a,button')?.focus();}
+function accountModal(){closeNavigation();const slot=document.querySelector('#account-menu-slot');if(!slot)return;if(slot.childElementCount){closeAccountMenu();return;}slot.innerHTML=accountMenu(S.user,S.profile,S);document.querySelector('[data-action="account"]')?.setAttribute('aria-expanded','true');slot.querySelector('a,button')?.focus();}
 function showAccountSettings(){closeAccountMenu();modal(accountSettings(S.user,S.profile,S));}
 function profileModal(){const parts=(S.user?.displayName||'').trim().split(/\s+/);modal(`<h2>A name to make it yours.</h2><p>Confirm your first and last names so your lecturer can recognise your practice.</p><form id="profile-form" class="form-stack">${nameFields(S.profile?.firstName||parts[0]||'',S.profile?.lastName||parts.slice(1).join(' '))}<p class="auth-error" role="alert" hidden></p><button type="submit" class="btn primary wide">Save my name</button></form>`);}
-function bindInbox(){stopInbox?.();stopInbox=null;if(S.user&&canPractise())stopInbox=F.watchInbox(S.user.uid,data=>{S.inbox={lastAdminSeq:0,userReadSeq:0,...data};const dot=document.querySelector('.inbox-button .unread-dot');if(dot)dot.hidden=!(S.inbox.lastAdminSeq>S.inbox.userReadSeq);});}
+function bindInbox(){stopInbox?.();stopInbox=null;if(S.user&&canPractise())stopInbox=F.watchInbox(S.user.uid,data=>{S.inbox={lastAdminSeq:0,userReadSeq:0,...data};const unread=S.inbox.lastAdminSeq>S.inbox.userReadSeq;document.querySelectorAll('[data-unread-indicator],[data-unread-label]').forEach(dot=>dot.hidden=!unread);});}
 function canTeach(){return S.admin||S.teacher;}
 async function loadCoachSettings(){try{S.coach=await F.api({action:'getCoachSettings'});}catch(err){S.coach={error:message(err)};}}
 async function completePractice(kind,details,localFeedback,slot){
@@ -60,13 +61,39 @@ async function completePractice(kind,details,localFeedback,slot){
 function canPractise(){return !!S.user&&(S.user.emailVerified||(S.user.uid==='shared-teacher'&&canTeach()));}
 function verificationModal(){modal(`<span class="auth-emblem" aria-hidden="true">信</span><h2>One last step. Check your inbox.</h2><p>We sent a verification link to <strong>${e(S.user.email)}</strong>. Open it to unlock your practice, then come back here.</p><div class="form-stack">${btn('I’ve verified my email','check-verification','primary wide')}${btn('Resend verification email','resend-verification','wide')}</div><p class="small muted">Check your spam folder too. Verification is required before you can practise.</p>`);}
 function verificationBanner(){return S.user&&!S.user.emailVerified&&S.user.uid!=='shared-teacher'?`<div class="verification-banner" role="status"><div><strong>Verify your email</strong><span>Open the link in your inbox to unlock all practice, including AI speech feedback.</span></div><div class="row">${btn('Resend email','resend-verification','small')}${btn('I’ve verified','check-verification','small')}</div></div>`:'';}
-function footer(){return `<footer class="footer"><span>Chinese Practice · A SATLE teaching prototype<br>Developed with Lucy Liu & Ivan Kulik</span><span><a href="#feedback" data-action="site-feedback">Feedback & screenshots</a> · <a href="#privacy" data-action="privacy">Privacy & practice data</a><br>少量练习，每天进步 · A little progress, every day.</span></footer>`;}
-function header(){return `<header class="topbar"><a class="brand" href="/chinese/"><span class="brand-mark">中</span><span><strong>Chinese Practice</strong><small>Learn. Try. Grow.</small></span></a><nav class="topnav" aria-label="Main navigation">${btn('Feedback','site-feedback','small')}<a class="nav-secondary" href="/chinese/" ${!adminPage?'aria-current="page"':''}>My learning</a>${canTeach()?`<a class="nav-secondary" href="/chinese/admin/" ${adminPage?'aria-current="page"':''}>Teaching space</a>`:''}${S.user?`${btn(`Messages <span class="unread-dot" ${!(S.inbox.lastAdminSeq>S.inbox.userReadSeq)?'hidden':''} aria-label="Unread messages"></span>`,'my-messages','small inbox-button')}<div class="account-wrap">${btn(`${avatar(S.user,S.profile)}<span>${e((S.user.displayName||'Account').split(' ')[0])}</span>`,'account','small',`aria-expanded="false" aria-controls="account-menu-slot" aria-label="Your account: ${e(S.user.displayName||'Your account')}"`)}<div id="account-menu-slot"></div></div>`:`${btn('Sign in','sign-in','small auth-nav-signin')}${btn('Register','register','primary small')}`}</nav></header>`;}
+function footer(){return `<footer class="footer"><span>Chinese Practice · A SATLE teaching prototype<br>Developed with Lucy Liu & Ivan Kulik</span><span>少量练习，每天进步 · A little progress, every day.</span></footer>`;}
+function header(){return navigationHeader(S,adminPage,location.hash);}
+function closeNavigation(){
+ const drawer=document.querySelector('#navigation-drawer');
+ if(drawer?.open)drawer.close();
+ document.querySelector('[data-action=navigation]')?.setAttribute('aria-expanded','false');
+}
+function openNavigation(){
+ closeAccountMenu();
+ const drawer=document.querySelector('#navigation-drawer');
+ if(!drawer)return;
+ if(drawer.open){closeNavigation();return;}
+ drawer.showModal();
+ document.querySelector('[data-action=navigation]')?.setAttribute('aria-expanded','true');
+}
+function bindNavigation(){
+ const drawer=document.querySelector('#navigation-drawer');
+ drawer.addEventListener('close',()=>document.querySelector('[data-action=navigation]')?.setAttribute('aria-expanded','false'));
+ drawer.addEventListener('click',event=>{
+  if(event.target.closest('a,button')){closeNavigation();return;}
+  if(event.target===drawer){
+   const r=drawer.getBoundingClientRect();
+   if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)closeNavigation();
+  }
+ });
+}
 function render(){
+ closeNavigation();
  if(canTeach()&&!S.admin&&!['curriculum','people','coach'].includes(S.adminTab))S.adminTab='curriculum';
  if(S.practice&&!canPractise()){resetVoice();S.practice=null;S.preview=false;}
  drawGeneration++;writer?.cancelQuiz();
  app.innerHTML=header()+`<main id="main" class="shell">${verificationBanner()}${S.error?`<div class="notice" role="alert">${e(S.error)} ${btn('Retry connection','reload','small')}</div>`:''}${adminPage?(canTeach()?(S.practice?practiceView():adminView()):loginView()):S.practice?practiceView():location.hash.startsWith('#performance')?performanceView(S.performance,S.performanceModule):location.hash==='#privacy'?privacyView():location.hash.startsWith('#module=')?moduleView():homeView()}${footer()}</main>`;
+ bindNavigation();
  if(S.practice&&S.practice.mode==='writing')setupWriter();
  if(adminPage&&S.admin&&S.adminTab==='settings'&&!S.settings.backendReady){
   const panel=document.querySelector('.admin-main');panel?.insertAdjacentHTML('afterbegin','<div class="notice">AI connections and the shared password will become available after the project’s billing setup is activated. Weekly editing and Google sign-in are ready now.</div>');
@@ -130,7 +157,7 @@ function quiz(){
 }
 async function saveAttempt(kind,correct,mistakes=0,hanzi){if(!canPractise()||S.preview)return;const p=S.practice;if(!p)return;try{const data={uid:S.user.uid,moduleId:p.lesson.moduleId,lessonId:lessonId(p.lesson.moduleId,p.lesson.week),hanzi:hanzi||p.words[p.index].hanzi,kind,correct,mistakes:Math.min(10000,Math.max(0,Math.round(mistakes))),createdAt:F.serverTimestamp()};await F.addDoc(F.collection(F.db,'attempts'),data);S.attempts.push(data);}catch{toast('Your attempt could not be saved. Please check your connection.');}}
 function loginView(){return `<div class="login-layout"><div class="login-intro"><span class="green-label">THE TEACHING SPACE</span><h1>Your classroom.<br>Your way.</h1><p>Choose the words. Shape each week.<br>Give your students a little more room to practise.</p><div class="login-art" aria-hidden="true"><span>学</span><small>Learn. Try. Grow.</small></div><p class="small">Register with Google or email. Registered users start as students. Kostas assigns teacher access.</p></div><section class="login-card">${S.user?`<h2>You're signed in.</h2><p class="small muted">${e(S.user.email)}<br>Teacher access must be assigned by the administrator.</p>${btn('Back to student practice','student','primary')}${btn('Edit my name','edit-profile','text')}${btn('Sign out','logout','text')}`:authView(S.authMode,S.settings.sharedLoginEnabled)}</section></div>`;}
-function adminView(){return `<div class="page-head"><div><div class="eyebrow">TEACHING SPACE</div><h1>Make room for progress.</h1><p>Small, purposeful activities. Your teaching, week by week.</p></div><a class="btn small" href="/chinese/">Student view ${icon('arrow')}</a></div><div class="admin-layout"><nav class="admin-nav" aria-label="Admin navigation">${[['curriculum','book','Curriculum'],['people','users',S.admin?'People & practice':'People'],['coach','book','Learning coach'],...(S.admin?[['settings','settings','Settings']]:[])].map(([k,i,t])=>`<a href="#${k}" data-action="admin-tab" data-tab="${k}" class="${S.adminTab===k?'active':''}">${icon(i)} ${t}</a>`).join('')}${S.admin?btn('Feedback inbox','feedback-inbox','small'):''}</nav><section class="admin-main">${S.practice?practiceView():S.adminTab==='people'?peopleView():S.adminTab==='coach'?coachSettingsView(S.coach,S.admin):(!S.admin||S.adminTab==='curriculum')?editorView():settingsView()}</section></div>`;}
+function adminView(){return `<div class="page-head"><div><div class="eyebrow">TEACHING SPACE</div><h1>Make room for progress.</h1><p>Small, purposeful activities. Your teaching, week by week.</p></div><a class="btn small" href="/chinese/">Student view ${icon('arrow')}</a></div><div class="admin-layout"><section class="admin-main">${S.practice?practiceView():S.adminTab==='people'?peopleView():S.adminTab==='coach'?coachSettingsView(S.coach,S.admin):(!S.admin||S.adminTab==='curriculum')?editorView():settingsView()}</section></div>`;}
 function editorView(){const d=S.draft||makeLesson(S.module,S.week),published=S.lessons.has(lessonId(S.module,S.week));return `<div class="admin-toolbar">${moduleSelect()}<span class="pill ${published?'':'neutral'}">${published?'Published lesson available':'Not visible to students'}</span></div><div class="admin-curriculum"><aside class="admin-weeks">${weeks(true)}</aside><form id="lesson-form" class="editor"><div class="form-section"><div class="row" style="margin-bottom:20px"><span class="eyebrow grow">WEEK ${String(S.week).padStart(2,'0')}</span><span id="draft-state" class="pill neutral">${S.dirty?'Unsaved changes':'Draft editor'}</span></div><div class="form-stack"><label>Week title<input name="title" maxlength="100" value="${e(d.title)}" required></label><label>A short introduction<textarea name="intro" maxlength="2000">${e(d.intro)}</textarea></label></div></div><div class="form-section"><h3>How students practise</h3><div class="form-grid">${[['writing','Character writing'],['speaking','Speaking & recording'],['pinyin','Pinyin practice'],['showPinyin','Show pinyin hints'],['showMeaning','Show English meaning'],['randomize','Shuffle vocabulary order']].map(([k,t])=>`<label class="check"><input name="${k}" type="checkbox" ${d[k]?'checked':''}>${t}</label>`).join('')}<label>Writing repetitions<input name="repetitions" type="number" min="1" max="10" value="${d.repetitions}"></label><label class="check"><input name="sample" type="checkbox" ${d.sample?'checked':''}>Label this as a sample lesson</label></div></div><div class="form-section"><div class="row"><h3 class="grow">This week’s vocabulary</h3>${btn(`${icon('plus')} Add word`,'add-word','small','type="button"')}</div><p>Use characters and words your class has learned. Add a short pronunciation tip if helpful.</p><div id="vocabulary-rows">${d.vocabulary.map(vocabRow).join('')}</div></div><div class="editor-actions"><button type="submit" class="btn primary">Save draft</button>${btn('Publish lesson','publish','','type="button"')}${btn('Preview lesson','preview','','type="button"')}${published?btn('Unpublish lesson','unpublish','danger-outline','type="button"'):''}</div><p class="small muted">Saving a draft does not change the lesson students see. Publish when it is ready.</p></form></div>`;}
 function vocabRow(w,i){return `<div class="vocab-row" data-index="${i}"><div class="row-title">WORD ${i+1}</div>${btn('Remove','remove-word','text small remove',`type="button" data-index="${i}" aria-label="Remove word ${i+1}"`)}<div class="form-grid"><label>Characters<input data-field="hanzi" value="${e(w.hanzi)}" maxlength="12" required lang="zh-CN"></label><label>Pinyin<input data-field="pinyin" value="${e(w.pinyin)}" maxlength="120" required></label><label>English meaning<input data-field="meaning" value="${e(w.meaning)}" maxlength="200" required></label></div><label class="hint-row">Pronunciation tip<input data-field="hint" value="${e(w.hint)}" maxlength="500"></label></div>`;}
 function readDraft(){const form=document.querySelector('#lesson-form');if(!form)return S.draft;const fd=new FormData(form),d={...S.draft,moduleId:S.module,week:S.week,title:fd.get('title'),intro:fd.get('intro'),repetitions:Number(fd.get('repetitions')),published:false,vocabulary:[...form.querySelectorAll('.vocab-row')].map((row,i)=>{const w={id:`word-${i+1}`};for(const input of row.querySelectorAll('[data-field]'))w[input.dataset.field]=input.value.trim();return w;})};for(const k of ['writing','speaking','pinyin','showPinyin','showMeaning','randomize','sample'])d[k]=fd.has(k);return d;}
@@ -184,6 +211,8 @@ function navigateGuard(action){if(!S.dirty){action();return;}modal(`<h2>Keep you
 let pendingNavigation=null;
 document.addEventListener('click',event=>{const b=event.target.closest('[data-action]');if(!b)return;const a=b.dataset.action;if(b.tagName==='A'||b.closest('form'))event.preventDefault();run(async()=>{
  switch(a){
+ case 'navigation':openNavigation();break;
+ case 'close-navigation':closeNavigation();break;
  case 'home':leave();location.hash='';render();break;
  case 'reload':await loadPublic();render();break;
  case 'start':await chooseModule(S.module);break;
