@@ -15,7 +15,7 @@ export function navigationHeader({user,profile,admin=false,teacher=false,inbox={
   <div class="navigation-heading"><h2 id="navigation-title">Explore</h2><button type="button" class="btn navigation-close" data-action="close-navigation" aria-label="Close navigation" autofocus>×</button></div>
   <nav class="navigation-links" aria-label="Main navigation">
    <a href="/chinese/"${current(!adminPage&&!hash.startsWith('#performance')&&hash!=='#privacy')}>My learning</a>
-   ${user?`<a href="/chinese/#performance" data-action="performance"${current(!adminPage&&hash.startsWith('#performance'))}>Performance</a>`:'<button type="button" data-action="register">Create an account</button><button type="button" data-action="site-feedback">Feedback</button>'}
+   ${user?`<a href="/chinese/#performance" data-action="performance"${current(!adminPage&&hash.startsWith('#performance'))}>Performance</a>`:'<button type="button" data-action="register">Create an account</button><button type="button" data-action="site-feedback">Feedback to improve website</button>'}
    ${teaching?`<h3>Teaching space</h3>${teachingLinks.map(([key,label])=>`<a href="/chinese/admin/#${key}"${adminPage?` data-action="admin-tab" data-tab="${key}"`:''}${current(adminPage&&adminTab===key)}>${label}</a>`).join('')}${admin?'<button type="button" data-action="feedback-inbox">Feedback inbox</button>':''}`:''}
    <h3>About</h3><a href="/chinese/#privacy" data-action="privacy"${current(!adminPage&&hash==='#privacy')}>Privacy & practice data</a>
   </nav>
