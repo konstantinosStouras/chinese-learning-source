@@ -26,6 +26,8 @@ firebase deploy --only firestore:rules,functions:chinese --project stouras-chine
 # The first deployment of the retry-enabled deletion worker also requires --force.
 ```
 
+The backend can also be deployed from GitHub without a local Firebase login: the `Deploy Firebase backend` workflow (`.github/workflows/deploy-functions.yml`) runs on every push to `main` that touches `_chinese-firebase/` and can be started by hand from the Actions tab. It needs the repository secret `FIREBASE_SERVICE_ACCOUNT`, the JSON key of a `stouras-chinese` service account with the Editor and Service Account User roles. The workflow runs the tests, then deploys Firestore rules and the `chinese` functions; the project guard still applies.
+
 Source lives in `konstantinosStouras/chinese-learning-source` (main), built `site/chinese/` assets in `konstantinosStouras/chinese-learning` (main). Commit and push both, then trigger the homepage `sync-projects.yml` workflow. The homepage contains submodule pointers: do not copy into or replace those paths. Wait for its checks and Pages publication, then compare live assets with the build. Local provisioning helpers and synthetic test data are not published.
 
 ## Activation

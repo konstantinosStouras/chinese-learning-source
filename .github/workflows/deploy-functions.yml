@@ -1,0 +1,48 @@
+# Deploys the Firebase backend (Firestore rules + the "chinese" functions) from GitHub.
+# Needs one repository secret: FIREBASE_SERVICE_ACCOUNT, the JSON key of a service account
+# in the stouras-chinese project with the Editor and Service Account User roles.
+name: Deploy Firebase backend
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '_chinese-firebase/**'
+      - '.github/workflows/deploy-functions.yml'
+concurrency:
+  group: deploy-firebase-backend
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Check that the deploy credential is configured
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: |
+          if [ -z "$SERVICE_ACCOUNT" ]; then
+            echo "::error::Add the FIREBASE_SERVICE_ACCOUNT repository secret (Settings > Secrets and variables > Actions) with the JSON key of a stouras-chinese service account."
+            exit 1
+          fi
+          node -e 'JSON.parse(process.env.SERVICE_ACCOUNT)' || { echo "::error::FIREBASE_SERVICE_ACCOUNT is not valid JSON."; exit 1; }
+      - name: Install and test
+        run: |
+          npm ci
+          npm --prefix _chinese-firebase/functions ci
+          npm test
+      - name: Deploy to stouras-chinese
+        working-directory: _chinese-firebase
+        env:
+          SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/firebase-service-account.json
+        run: |
+          printf '%s' "$SERVICE_ACCOUNT" > "$GOOGLE_APPLICATION_CREDENTIALS"
+          npx --yes firebase-tools@15 deploy --only firestore:rules,functions:chinese --project stouras-chinese --non-interactive --force
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
