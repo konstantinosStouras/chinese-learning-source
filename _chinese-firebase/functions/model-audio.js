@@ -41,7 +41,7 @@ function createPronunciation(db,readSecret,limits,generate=generateModelAudio){r
  const [lessonDoc,settingsDoc]=await Promise.all([db.doc(`lessons/${d.lessonId}`).get(),db.doc('settings/public').get()]);
  const lesson=lessonDoc.data(),word=lesson?.vocabulary?.find(w=>w.id===d.wordId),settings=settingsDoc.data();
  if(!lesson?.published||!lesson.speaking||!word||typeof word.hanzi!=='string'||word.hanzi.length>40)fail('failed-precondition','This speaking exercise is no longer available.');
- if(settings?.speechProvider!=='openai'||!settings?.openaiConfigured)fail('failed-precondition','A connected OpenAI service is needed for this pronunciation example.');
+ if(!['openai','azure'].includes(settings?.speechProvider)||!settings?.openaiConfigured)fail('failed-precondition','A connected OpenAI service is needed for this pronunciation example.');
  const hash=createHash('sha256').update(JSON.stringify([MODEL,'cedar-v1',word.hanzi,word.pinyin])).digest('hex'),ref=db.doc(`modelAudio/${hash}`);
  const cached=await db.runTransaction(async t=>{const data=(await t.get(ref)).data();if(data?.audio)return data.audio;if(data?.leaseUntil>Date.now())fail('unavailable','The pronunciation example is being prepared. Try Listen again in a moment.');t.set(ref,{leaseUntil:Date.now()+65000});return null;});
  if(cached)return {audio:cached,mime:'audio/wav'};

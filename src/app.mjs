@@ -24,7 +24,7 @@ const playback=createSpeechPlayback({getModel:loadModelAudio,synthesis:window.sp
 async function loadModelAudio(){
  const p=S.practice,index=p.index,take=p.speechTake,w=p.words[index];
  if(S.preview)throw Error('Publish the lesson before requesting a server pronunciation example.');
- if(S.settings.speechProvider!=='openai')throw Error('No device Mandarin voice is available. Connect OpenAI in Settings for a spoken example, or follow the pinyin guide.');
+ if(!['openai','azure'].includes(S.settings.speechProvider)||!S.settings.openaiConfigured)throw Error('No device Mandarin voice is available. Connect OpenAI in Settings for a spoken example, or follow the pinyin guide.');
  const key=JSON.stringify([p.lesson.moduleId,p.lesson.week,w.id,w.hanzi,w.pinyin]);let url=modelUrls.get(key);
  if(!url){const result=await F.api({action:'pronunciation',lessonId:lessonId(p.lesson.moduleId,p.lesson.week),wordId:w.id});if(S.practice!==p||p.index!==index||p.mode!=='speaking'||p.speechTake!==take)return null;
  const bytes=Uint8Array.from(atob(result.audio),c=>c.charCodeAt(0));url=URL.createObjectURL(new Blob([bytes],{type:result.mime}));modelUrls.set(key,url);}

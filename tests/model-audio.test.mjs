@@ -27,3 +27,10 @@ test('pronunciation cache shares one generation and changes when the lecturer ch
 test('model PCM is wrapped as browser-playable 24 kHz mono WAV',()=>{
  const result=model.wav(Buffer.alloc(24000));assert.equal(result.toString('ascii',0,4),'RIFF');assert.equal(result.readUInt32LE(24),24000);assert.equal(result.readUInt16LE(22),1);assert.equal(result.readUInt32LE(40),24000);assert.equal(result.length,24044);
 });
+
+test('Azure feedback keeps OpenAI model examples available without enabling examples when off',async()=>{
+ const f=fixture();f.values.get('settings/public').speechProvider='azure';
+ await f.run(request,user,false);assert.deepEqual(f.counts(),{calls:1,charged:1});
+ f.values.get('settings/public').openaiConfigured=false;await assert.rejects(()=>f.run(request,user,false),e=>e.code==='failed-precondition');
+ f.values.get('settings/public').openaiConfigured=true;f.values.get('settings/public').speechProvider='off';await assert.rejects(()=>f.run(request,user,false),e=>e.code==='failed-precondition');
+});
