@@ -1,16 +1,12 @@
 const WebSocket=require('ws');
-const {pinyin}=require('pinyin-pro');
+const {matchSpeech}=require('./speech-match');
 const {createHash}=require('node:crypto');
 const {HttpsError}=require('firebase-functions/v2/https');
 const MODEL='gpt-realtime-2.1-mini';
 const fail=(code,message)=>{throw new HttpsError(code,message);};
 function matchesTarget(transcript,word){
- const clean=s=>String(s).replace(/[^\p{Script=Han}]/gu,'');
- const heard=clean(transcript),target=clean(word.hanzi);
- if(!heard||heard.length!==target.length)return false;
- if(heard===target)return true;
- // A spoken homophone may be transcribed as another character, e.g. 午 / 五.
- return pinyin(heard,{toneType:'num'})===pinyin(target,{toneType:'num'});
+ // A spoken homophone may be transcribed as another character, e.g. 午 / 五, but nothing extra may be read out.
+ const m=matchSpeech(transcript,word);return m.recognised&&m.toneMatched&&m.extra===0;
 }
 function wav(pcm){
  const h=Buffer.alloc(44);h.write('RIFF');h.writeUInt32LE(pcm.length+36,4);h.write('WAVEfmt ',8);h.writeUInt32LE(16,16);h.writeUInt16LE(1,20);h.writeUInt16LE(1,22);h.writeUInt32LE(24000,24);h.writeUInt32LE(48000,28);h.writeUInt16LE(2,32);h.writeUInt16LE(16,34);h.write('data',36);h.writeUInt32LE(pcm.length,40);return Buffer.concat([h,pcm]);

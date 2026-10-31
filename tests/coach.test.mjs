@@ -21,6 +21,10 @@ test('scores are stable across every coach style, with explicit measures',()=>{
  assert.equal(core.pinyinFeedback('wù',{pinyin:'wǔ'}).score,7);
  assert.ok(core.pinyinFeedback('wo3',{pinyin:'wǔ'}).score<7);
  assert.equal(core.speakingFeedback({provider:'openai',matched:true}).basis,'Word recognition only');
+ assert.equal(core.speakingFeedback({provider:'openai',matched:true}).score,10);
+ assert.equal(core.speakingFeedback({provider:'openai',matched:false,match:{recognised:false,score:3,soundMatches:1,syllables:2}}).score,3);
+ assert.equal(core.speakingFeedback({provider:'openai',matched:true,match:{recognised:true,toneMatched:false,score:8,soundMatches:1,syllables:1,heard:'wú',target:'wǔ'}}).label,'Sounds recognised — check the tone');
+ assert.equal(core.speakingFeedback({provider:'openai',matched:true,match:{recognised:true,toneMatched:false,score:8,soundMatches:1,syllables:1}}).correct,true);
  assert.equal(core.speakingFeedback({provider:'azure',accuracy:84}).score,8.4);
  const samples=Object.keys(core.STYLES).map(style=>core.examples({style}));
  assert.ok(samples.every(s=>s.map(x=>x.score).join()===samples[0].map(x=>x.score).join()));

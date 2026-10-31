@@ -12,6 +12,7 @@ const {validateLesson,owner}=require('./validation');
 const {roles,authorize}=require('./roles');
 const {createCoach}=require('./coach');
 const practiceCore=require('./practice-core');
+const {matchSpeech}=require('./speech-match');
 initializeApp();
 const db=getFirestore(),secrets=new SecretManagerServiceClient();
 const accounts=createAccounts(db,getAuth());
@@ -128,12 +129,15 @@ exports.chineseApi=onCall({region:'europe-west1',maxInstances:2,minInstances:0,m
    const credentials=await secret(provider);await limits(req.auth.uid);
    let result;
    if(provider==='openai'){
-    const form=new FormData();form.append('file',new Blob([wav],{type:'audio/wav'}),'practice.wav');form.append('model','gpt-transcribe');form.append('languages[]','zh');
+    // Tell the recogniser which lesson words to expect so isolated syllables are written as Mandarin characters.
+    const vocabulary=lesson.vocabulary.filter(w=>typeof w.hanzi==='string'&&w.hanzi.trim()).slice(0,60);
+    const form=new FormData();form.append('file',new Blob([wav],{type:'audio/wav'}),'practice.wav');form.append('model','gpt-transcribe');form.append('languages[]','zh');form.append('response_format','json');
+    form.append('prompt',`Mandarin Chinese pronunciation practice. The learner says one vocabulary word on its own, possibly slowly. Write Simplified Chinese characters only. Lesson words: ${vocabulary.map(w=>`${w.hanzi.trim()}${w.pinyin?` (${String(w.pinyin).trim()})`:''}`).join('、')}`.slice(0,2000));
+    for(const w of vocabulary)form.append('keywords[]',w.hanzi.trim().slice(0,40));
     const response=await fetch('https://api.openai.com/v1/audio/transcriptions',{method:'POST',headers:{Authorization:`Bearer ${credentials.key}`},body:form,signal:AbortSignal.timeout(55000)});
     if(!response.ok)fail('unavailable','The speech service could not process this recording. Ask your lecturer to check the API key and account credit.');
-    const data=await response.json(),transcript=String(data.text||'').slice(0,500),clean=s=>s.replace(/[^\p{Script=Han}]/gu,'');
-    const match=clean(transcript)===clean(word.hanzi);
-    result={provider,transcript,matched:match,feedback:transcript?(match?'The recognised word matches. Listen to your recording and compare each syllable with the model.':'The recognised words differ. Try once more, slowly, with a clear pause before and after the word.'):'No speech was recognised. Move closer to the microphone and try again.',hint:word.hint,notice:'Speech recognition checks the words heard. It does not measure tone accuracy or provide a pronunciation grade.'};
+    const data=await response.json(),transcript=String(data.text||'').slice(0,500),match=matchSpeech(transcript,word);
+    result={provider,transcript,matched:match.recognised,match,feedback:transcript?(match.recognised?(match.toneMatched?'The recognised sounds match the target. Listen to your recording and compare each syllable with the model.':'The recognised sounds match, but the recogniser chose a different tone. Compare your pitch with the model.'):match.soundMatches>0?'Only part of the word was recognised. Say every syllable together, slowly, then try again.':'The recognised words differ. Try once more, slowly, with a clear pause before and after the word.'):'No speech was recognised. Move closer to the microphone and try again.',hint:word.hint,notice:'Speech recognition compares the sounds heard with the target pinyin. It does not measure tone accuracy or provide a pronunciation grade.'};
    }else{
     const config=Buffer.from(JSON.stringify({ReferenceText:word.hanzi,GradingSystem:'HundredMark',Granularity:'Phoneme',Dimension:'Comprehensive',EnableMiscue:true})).toString('base64');
     const response=await fetch(`https://${credentials.resource}.cognitiveservices.azure.com/stt/speech/recognition/conversation/cognitiveservices/v1?language=zh-CN&format=detailed`,{method:'POST',headers:{'Ocp-Apim-Subscription-Key':credentials.key,'Pronunciation-Assessment':config,'Content-Type':'audio/wav; codecs=audio/pcm; samplerate=16000','Accept':'application/json'},body:wav,signal:AbortSignal.timeout(55000)});

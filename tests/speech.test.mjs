@@ -16,6 +16,17 @@ test('verdict gives actionable recognition feedback without inventing pronunciat
  assert.equal(speakingVerdict(word,{provider:'azure',accuracy:65}).level,'close');
 });
 
+test('verdict trusts the server sound match so homophones and tone hints are shown honestly',()=>{
+ const word={hanzi:'午',pinyin:'wǔ'};
+ const same=speakingVerdict(word,{provider:'openai',transcript:'五',matched:true,match:{recognised:true,toneMatched:true,score:10,syllables:1,soundMatches:1,toneMatches:1,extra:0,heard:'wǔ',target:'wǔ',homophone:true}});
+ assert.equal(same.level,'good');assert.match(same.detail,/五 \(wǔ\), which sounds the same as 午/);
+ const tone=speakingVerdict(word,{provider:'openai',transcript:'无',matched:true,match:{recognised:true,toneMatched:false,score:8,syllables:1,soundMatches:1,toneMatches:0,extra:0,heard:'wú',target:'wǔ',homophone:true}});
+ assert.equal(tone.level,'good');assert.match(tone.label,/check the tone/);assert.match(tone.detail,/wú where the target is wǔ/);
+ assert.equal(speakingVerdict(word,{provider:'openai',transcript:'我说午',matched:false,match:{recognised:false,toneMatched:false,score:6,syllables:1,soundMatches:1,toneMatches:1,extra:2,heard:'wǒ shuō wǔ',target:'wǔ',homophone:false}}).level,'close');
+ assert.equal(speakingVerdict({hanzi:'你好',pinyin:'nǐ hǎo'},{provider:'openai',transcript:'你',matched:false,match:{recognised:false,toneMatched:false,score:3,syllables:2,soundMatches:1,toneMatches:1,extra:0,heard:'nǐ',target:'nǐ hǎo',homophone:false}}).level,'close');
+ assert.equal(speakingVerdict(word,{provider:'openai',transcript:'二',matched:false,match:{recognised:false,toneMatched:false,score:0,syllables:1,soundMatches:0,toneMatches:0,extra:0,heard:'èr',target:'wǔ',homophone:false}}).level,'retry');
+});
+
 test('feedback presents target, submitted audio and honest English guidance in order',()=>{
  const html=speechFeedbackView({hanzi:'午',pinyin:'wǔ',meaning:'noon',hint:'Keep the third tone low.'},{provider:'openai',transcript:'五',matched:false},'blob:test');
  assert.ok(html.indexOf('Correct pronunciation')<html.indexOf('<h4>Your recording'));
@@ -23,6 +34,8 @@ test('feedback presents target, submitted audio and honest English guidance in o
  assert.match(html,/wǔ/);assert.match(html,/src="blob:test"/);assert.match(html,/cannot tell us which sound or tone/);
  const matched=speechFeedbackView({hanzi:'午',pinyin:'wǔ'},{provider:'openai',transcript:'午',matched:true},'blob:test');
  assert.match(matched,/does not confirm correct tones/);
+ const homophone=speechFeedbackView({hanzi:'午',pinyin:'wǔ',meaning:'noon'},{provider:'openai',transcript:'五',matched:true,match:{recognised:true,toneMatched:true,score:10,syllables:1,soundMatches:1,toneMatches:1,extra:0,heard:'wǔ',target:'wǔ',homophone:true}},'blob:test');
+ assert.match(homophone,/10\.0<small> \/ 10/);assert.match(homophone,/sounds the same as 午/);assert.match(homophone,/Good match/);assert.match(homophone,/homophones such as 五 for 午 count/);
 });
 
 test('tone guidance handles written/numeric tones without guessing joined syllables',()=>{
